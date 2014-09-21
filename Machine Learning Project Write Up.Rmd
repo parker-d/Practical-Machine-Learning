@@ -1,0 +1,85 @@
+# Analysis of the Human Activity Recognition exercise data set
+
+## ---------------------------------------
+
+## EXECUTIVE SUMMARY
+The objective of this project was to use the Human Activity Recognition exercise data set to train a model that could then accurately predict the manner in which an individual did an exercise.  
+
+The method used to generate the prediction model was the random forest 'rf' method in the 'caret' package in R.  The training data was manipulated to create a data set that contained only those variables that were likely to be predictive.  The training data set was split using the 'createDataPartition' function into separate data sets, one to train the model and one for cross validation. 
+
+Using the data set that was partitioned and set-aside for cross-validation, the model accuracy was estimated to be 99.32%.  
+
+
+## CHOICE OF VARIABLES TO USE IN THE MODEL
+The 'nearZeroVar' function was used to identify all of the variables that had only unique values and to remove variables that have very few unique values relative to the total number of observations, and where the ratio of the most common value to next most common value is large (i.e. highly overdispersed.  (this explanation taken from stackoverflow).   In this project, the default parameters were used, specifically a predictor is classified as near-zero variance if the percentage of unique values in the samples is less than {10%} and when the frequency ratio mentioned above is greater than 19 (95/5).  (this explanation taken from R-Bloggers).
+
+Other variables were removed because it was (obviously) evident that they were not predictive.  These included the user names, the timestamp variables and the window number.  
+
+```{r, eval=FALSE}
+training <- read.csv("~/pml-training.csv", header=TRUE)
+testing <- read.csv("~/pml-testing.csv", header=TRUE)
+
+training <- training[training$new_window!="yes",]
+training$user_name <- NULL
+training$raw_timestamp_part_1 <- NULL
+training$raw_timestamp_part_2 <- NULL
+training$cvtd_timestamp <- NULL
+training$num_window <- NULL
+testing$user_name <- NULL
+testing$raw_timestamp_part_1 <- NULL
+testing$raw_timestamp_part_2 <- NULL
+testing$cvtd_timestamp <- NULL
+testing$num_window <- NULL
+```
+
+```{r, eval=FALSE}
+nearZeroVaridx <- nearZeroVar(training)
+training <- training[,-nearZeroVaridx]
+testing <- testing[,-nearZeroVaridx]
+rm(nearZeroVaridx)
+```
+
+
+## DATA SET FOR CROSS-VALIDATION
+The training data set was split using the 'createDataPartition' function into separate data sets, one to train the model and one for cross validation.  The 'pml-training' data set was split into a 'traindf' dataframe and a 'validatedf' dataframe.  The split was 75% of the instances were randomly assigned to the 'traindf' dataframe and the remaining 25% of the instances were randomly assigned to the ''validatedf' dataframe.
+The 75%-25% split was chosen based on the "Rules of Thumb" slide (slide7) from the "Prediction Study Design" lecture of the Coursera Practical Machine Learning course.
+Note: the rule of thumb for a large sample size was given as 60% training, 20% test and 20% validation.  Since the test data was provided as the 'pml-testing' data set, no data needed to be set aside for testing, so 60%-20%-20% allocation becomes 75%-0%-25% in order to keep the same proportion of training to validation.
+
+```{r, eval=FALSE}
+set.seed(12345)
+trainIndex <- createDataPartition(training$X, p=0.75, list=FALSE)
+traindf <- training[trainIndex,]
+validatedf <- training[-trainIndex,]
+
+traindf$X <- NULL
+validatedf$X <- NULL
+testing$X <- NULL
+
+rm(training)
+rm(trainIndex)
+```
+
+
+## CHOICE OF MODEL METHOD
+A random forest model method was chosen because it was considered a good option in that it would perform well by splitting the many predictive variables into groups and evaluating and grouping based on homogeneity within each group of variables.  The model was generated using the random forest 'rf' method in the 'caret' package in R. 
+
+```{r, eval=FALSE}
+set.seed(12345)
+modFitRF <- train(classe ~ ., method="rf", data=traindf)
+```
+
+
+## CROSS VALIDATION AND ESTIMATION OF OUT-OF-SAMPLE ERROR
+The accuracy of the prediction model was tested on the validation data set (validatedf).  The confusion matrix that was generated shows that the model accuracy was estimated to be 99.32%.  The 95% confidence interval of the accuracy is 99.08% to 99.52%.
+
+```{r, eval=FALSE}
+predictionRF <- predict(modFitRF, newdata=validatedf)
+confusionMatrix(predictionRF, validatedf$classe)
+```
+
+
+## PREDICTING THE CLASSE OF THE TEST CASES
+
+```{r, eval=FALSE}
+answers <- predict(modFitRF, newdata=testing)
+```
